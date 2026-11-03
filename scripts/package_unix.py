@@ -66,7 +66,7 @@ with tempfile.TemporaryDirectory(prefix="potatorec-package-") as temporary:
         macos.mkdir(parents=True)
         for name in ("potato-recorder", "potato-recorder-cli"):
             subprocess.run(["lipo", "-create", str(ROOT / "target/x86_64-apple-darwin/release" / name), str(ROOT / "target/aarch64-apple-darwin/release" / name), "-output", str(macos / name)], check=True)
-            subprocess.run(["lipo", "-verify_arch", "x86_64", "arm64", str(macos / name)], check=True)
+            subprocess.run(["lipo", str(macos / name), "-verify_arch", "x86_64", "arm64"], check=True)
             (macos / name).chmod(0o755)
         info = {"CFBundleName": "Potato Recorder", "CFBundleDisplayName": "Potato Recorder", "CFBundleIdentifier": "com.boranseason.potatorec", "CFBundleExecutable": "potato-recorder", "CFBundlePackageType": "APPL", "CFBundleShortVersionString": version, "CFBundleVersion": version, "LSMinimumSystemVersion": "12.0", "NSHighResolutionCapable": True, "NSMicrophoneUsageDescription": "Record microphone commentary only when you enable recording or a microphone test.", "NSScreenCaptureUsageDescription": "Record the display you explicitly select."}
         with (app / "Contents/Info.plist").open("wb") as handle:
@@ -74,6 +74,9 @@ with tempfile.TemporaryDirectory(prefix="potatorec-package-") as temporary:
         docs(resources)
         (volume / "Applications").symlink_to("/Applications")
         shutil.copy2(ROOT / "docs/CROSS_PLATFORM.md", volume / "Read Me - Experimental Builds.md")
+        for name in ("potato-recorder", "potato-recorder-cli"):
+            subprocess.run(["codesign", "--force", "--sign", "-", str(macos / name)], check=True)
+        subprocess.run([str(macos / "potato-recorder-cli"), "--diagnose"], check=True)
         subprocess.run(["codesign", "--force", "--deep", "--sign", "-", str(app)], check=True)
         subprocess.run(["codesign", "--verify", "--deep", "--strict", str(app)], check=True)
         subprocess.run(["hdiutil", "create", "-volname", "Potato Recorder", "-srcfolder", str(volume), "-ov", "-format", "UDZO", str(dist / f"potatorec-{version}-macos-universal.dmg")], check=True)
