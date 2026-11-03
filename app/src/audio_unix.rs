@@ -30,7 +30,7 @@ pub fn devices_for(ffmpeg: &Path) -> Result<Vec<Device>> {
             .into_iter()
             .filter(|(audio, _, _)| *audio)
             .map(|(_, id, name)| Device {
-                id: id.to_string(),
+                id: format!("{id}:{name}"),
                 name,
                 render: false,
             })
@@ -55,6 +55,22 @@ pub fn devices_for(ffmpeg: &Path) -> Result<Vec<Device>> {
             })
         })
         .collect())
+}
+fn mac_device_index(saved: &str, devices: &[(bool, u32, String)]) -> Result<u32> {
+    if saved.is_empty() {
+        return Ok(0);
+    }
+    let (index, name) = saved
+        .split_once(':')
+        .context("Refresh audio devices and select the input again")?;
+    let index: u32 = index.parse()?;
+    anyhow::ensure!(
+        devices
+            .iter()
+            .any(|(audio, i, n)| *audio && *i == index && n == name),
+        "Selected audio device changed or is unavailable. Refresh devices and select the input again."
+    );
+    Ok(index)
 }
 #[derive(Default)]
 pub struct AudioMetrics {
@@ -122,14 +138,10 @@ impl AudioCapture {
                 !loopback,
                 "macOS AVFoundation has no system loopback; disable Desktop Audio and select a configured virtual device as Additional Input"
             );
-            let device = if settings.device_id.is_empty() {
-                "0"
-            } else {
-                &settings.device_id
-            };
-            let index: u32 = device
-                .parse()
-                .context("Select a valid AVFoundation microphone/input index")?;
+            let index = mac_device_index(
+                &settings.device_id,
+                &platform::avfoundation_devices(&ffmpeg),
+            )?;
             args.extend([
                 "-f".into(),
                 "avfoundation".into(),
@@ -324,5 +336,22 @@ impl AudioCapture {
 impl Drop for AudioCapture {
     fn drop(&mut self) {
         let _ = self.stop();
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    fn stale_virtual_input_cannot_silently_become_a_microphone() {
+        let before = vec![(true, 2, "Virtual Loopback".into())];
+        let after = vec![
+            (true, 2, "Physical Microphone".into()),
+            (true, 3, "Virtual Loopback".into()),
+        ];
+        assert_eq!(mac_device_index("2:Virtual Loopback", &before).unwrap(), 2);
+        assert!(mac_device_index("2:Virtual Loopback", &after).is_err());
+        assert_eq!(mac_device_index("3:Virtual Loopback", &after).unwrap(), 3);
+        assert!(mac_device_index("2", &before).is_err());
     }
 }

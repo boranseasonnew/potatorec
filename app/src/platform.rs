@@ -498,6 +498,9 @@ pub fn ensure_output(path: &Path) -> Result<()> {
     Ok(())
 }
 
+pub fn validate_source_for(source: &Source, _: &Path) -> Result<()> {
+    validate_source(source)
+}
 pub fn sources_for(_: &Path) -> Vec<Source> {
     sources()
 }

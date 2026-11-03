@@ -22,7 +22,7 @@ Open the DMG and drag **Potato Recorder.app** to Applications. The universal app
 
 The preview is **ad-hoc signed, not Developer ID signed or notarized**. It is not presented as an Apple-trusted distribution. A Developer ID identity and notarization credentials are required for a polished public macOS distribution; none are included in the repository.
 
-Screen and microphone permissions must be granted by the user in macOS. The app does not bypass privacy dialogs. Device discovery selects only AVFoundation entries explicitly named “Capture screen”; it does not substitute a camera for an unavailable screen. VideoToolbox probes disallow software fallback (`allow_sw=0`); when it fails the app offers the tested software encoder.
+Screen and microphone permissions must be granted by the user in macOS. The app does not bypass privacy dialogs. Device discovery selects only AVFoundation entries explicitly named “Capture screen”; it does not substitute a camera for an unavailable screen. Saved display/audio indices are checked against current device names before capture. If hardware changes reorder the indices, refresh devices and select the intended source again; a stale screen index cannot silently open a camera. VideoToolbox probes disallow software fallback (`allow_sw=0`); when it fails the app offers the tested software encoder.
 
 AVFoundation does not provide native system-output loopback here. Desktop Audio is disabled on this platform. A user-configured virtual loopback input can be selected as **Additional Input**. No audio driver or OS audio routing is installed/changed automatically.
 

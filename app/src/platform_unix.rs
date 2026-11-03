@@ -232,7 +232,7 @@ pub fn sources_for(ffmpeg: &Path) -> Vec<Source> {
     if cfg!(target_os = "macos") {
         return avfoundation_devices(ffmpeg)
             .into_iter()
-            .filter(|(audio, _, name)| !*audio && name.contains("Capture screen"))
+            .filter(|(audio, _, name)| !*audio && is_screen_name(name))
             .map(|(_, device, name)| Source::MacDisplay { device, name })
             .collect();
     }
@@ -324,6 +324,19 @@ pub fn prepare_config(c: &mut Config) -> Result<()> {
     Ok(())
 }
 pub fn validate_source(source: &Source) -> Result<()> {
+    validate_source_for(source, Path::new("ffmpeg"))
+}
+fn is_screen_name(name: &str) -> bool {
+    name.strip_prefix("Capture screen ")
+        .is_some_and(|n| n.parse::<u32>().is_ok())
+}
+fn mac_screen_available(device: u32, expected: &str, devices: &[(bool, u32, String)]) -> bool {
+    is_screen_name(expected)
+        && devices
+            .iter()
+            .any(|(audio, index, name)| !*audio && *index == device && name == expected)
+}
+pub fn validate_source_for(source: &Source, ffmpeg: &Path) -> Result<()> {
     match source {
         Source::X11Display { width, height, .. } => {
             anyhow::ensure!(*width > 0 && *height > 0, "Invalid X11 dimensions")
@@ -334,11 +347,31 @@ pub fn validate_source(source: &Source) -> Result<()> {
                 .any(|s| matches!(s,Source::X11Window{id:i,pid:p,..}if i==id&&p==pid)),
             "Selected X11 window no longer exists"
         ),
-        Source::MacDisplay { .. } => {}
+        Source::MacDisplay { device, name } => anyhow::ensure!(
+            mac_screen_available(*device, name, &avfoundation_devices(ffmpeg)),
+            "Selected screen device changed or is unavailable. Refresh sources and select a display again."
+        ),
         _ => anyhow::bail!("Select a capture source for the current operating system"),
     };
     Ok(())
 }
 pub fn minimized(_: &Source) -> bool {
     false
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    fn stale_screen_index_never_opens_a_camera() {
+        let before = vec![(false, 1, "Capture screen 0".into())];
+        let after = vec![
+            (false, 1, "External Camera".into()),
+            (false, 2, "Capture screen 0".into()),
+        ];
+        assert!(mac_screen_available(1, "Capture screen 0", &before));
+        assert!(!mac_screen_available(1, "Capture screen 0", &after));
+        assert!(mac_screen_available(2, "Capture screen 0", &after));
+        assert!(!mac_screen_available(1, "External Camera", &after));
+    }
 }

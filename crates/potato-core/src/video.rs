@@ -355,7 +355,13 @@ fn unix_recording_args(
                 display,
             ]);
         }
-        (Backend::AvFoundation, Source::MacDisplay { device, .. }) => {
+        (Backend::AvFoundation, Source::MacDisplay { name, .. }) => {
+            if !name
+                .strip_prefix("Capture screen ")
+                .is_some_and(|s| s.parse::<u32>().is_ok())
+            {
+                return Err("AVFoundation recording accepts display sources only".into());
+            }
             a.extend([
                 "-f".into(),
                 "avfoundation".into(),
@@ -364,7 +370,7 @@ fn unix_recording_args(
                 "-capture_cursor".into(),
                 u8::from(v.cursor).to_string(),
                 "-i".into(),
-                format!("{device}:none"),
+                format!("{name}:none"),
             ]);
         }
         _ => return Err("Select a source supported by this operating system".into()),
@@ -494,9 +500,23 @@ mod tests {
             Path::new("capture.mkv"),
         )
         .unwrap();
-        assert!(a.windows(2).any(|x| x == ["-i", "2:none"]));
+        assert!(a.windows(2).any(|x| x == ["-i", "Capture screen 0:none"]));
         assert!(a.windows(2).any(|x| x == ["-allow_sw", "0"]));
         assert!(!a.iter().any(|x| x.contains("d3d11")));
+        c.video.source = Source::MacDisplay {
+            device: 2,
+            name: "Camera".into(),
+        };
+        assert!(
+            recording_args(
+                &c,
+                Backend::AvFoundation,
+                Encoder::AppleH264,
+                GpuPath::CpuTransfer,
+                Path::new("capture.mkv")
+            )
+            .is_err()
+        );
     }
     #[test]
     fn priority_never_realtime() {

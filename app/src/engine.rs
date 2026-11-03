@@ -343,7 +343,7 @@ impl Controller {
         anyhow::ensure!(!self.active(), "A recording is already active");
         c.validate()?;
         platform::prepare_config(&mut c)?;
-        platform::validate_source(&c.video.source)?;
+        platform::validate_source_for(&c.video.source, &c.ffmpeg)?;
         platform::ensure_output(&c.output_dir)?;
         cap.select(&c)?;
         cap.backend(&c)?;
@@ -506,6 +506,7 @@ fn record_session(
     let mut previous_elapsed = 0.;
     let mut previous_frames = 0;
     while !stop {
+        platform::validate_source_for(&c.video.source, &c.ffmpeg)?;
         let index = manifest.clips.len();
         let segment = folder.join(format!("segment-{index}"));
         fs::create_dir(&segment)?;
