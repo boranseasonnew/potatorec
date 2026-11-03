@@ -146,7 +146,11 @@ impl AudioCapture {
                 "-f".into(),
                 "avfoundation".into(),
                 "-i".into(),
-                format!("none:{index}"),
+                if settings.device_id.is_empty() {
+                    "none:default".into()
+                } else {
+                    format!("none:{index}")
+                },
             ]);
         } else {
             let device = if !settings.device_id.is_empty() {
