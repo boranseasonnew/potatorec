@@ -60,8 +60,8 @@ macro_rules! choices {
         }
     }
 }
-choices!(Backend { Auto=>"Auto", Wgc=>"Windows Graphics Capture", Dxgi=>"DXGI Desktop Duplication" });
-choices!(Encoder { Auto=>"Auto · Hardware H.264", AmdH264=>"AMD H.264", AmdHevc=>"AMD HEVC", NvidiaH264=>"NVIDIA H.264", NvidiaHevc=>"NVIDIA HEVC", IntelH264=>"Intel H.264", IntelHevc=>"Intel HEVC", Mf=>"Media Foundation H.264", Software=>"Software H.264" });
+choices!(Backend { Auto=>"Auto", Wgc=>"Windows Graphics Capture", Dxgi=>"DXGI Desktop Duplication", X11=>"X11 (Linux)", AvFoundation=>"AVFoundation (macOS)" });
+choices!(Encoder { Auto=>"Auto · Hardware H.264", AmdH264=>"AMD H.264", AmdHevc=>"AMD HEVC", NvidiaH264=>"NVIDIA H.264", NvidiaHevc=>"NVIDIA HEVC", IntelH264=>"Intel H.264", IntelHevc=>"Intel HEVC", Mf=>"Media Foundation H.264", Software=>"Software H.264", AppleH264=>"Apple VideoToolbox H.264", AppleHevc=>"Apple VideoToolbox HEVC" });
 impl Encoder {
     pub fn codec(self) -> &'static str {
         match self {
@@ -73,6 +73,8 @@ impl Encoder {
             Self::IntelHevc => "hevc_qsv",
             Self::Mf => "h264_mf",
             Self::Software => "libx264",
+            Self::AppleH264 => "h264_videotoolbox",
+            Self::AppleHevc => "hevc_videotoolbox",
         }
     }
     pub fn hardware(self) -> bool {
@@ -165,8 +167,34 @@ choices!(VoicePreset { Natural=>"Natural", Clean=>"Clean Voice", Strong=>"Strong
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum Source {
-    Monitor { index: u32, name: String },
-    Window { hwnd: u64, title: String, pid: u32 },
+    X11Display {
+        display: String,
+        x: i32,
+        y: i32,
+        width: u32,
+        height: u32,
+        name: String,
+    },
+    X11Window {
+        id: u64,
+        pid: u32,
+        width: u32,
+        height: u32,
+        title: String,
+    },
+    MacDisplay {
+        device: u32,
+        name: String,
+    },
+    Monitor {
+        index: u32,
+        name: String,
+    },
+    Window {
+        hwnd: u64,
+        title: String,
+        pid: u32,
+    },
 }
 impl Default for Source {
     fn default() -> Self {
@@ -179,6 +207,8 @@ impl Default for Source {
 impl Source {
     pub fn label(&self) -> &str {
         match self {
+            Self::X11Display { name, .. } | Self::MacDisplay { name, .. } => name,
+            Self::X11Window { title, .. } => title,
             Self::Monitor { name, .. } => name,
             Self::Window { title, .. } => title,
         }
@@ -389,7 +419,7 @@ impl Default for Audio {
     fn default() -> Self {
         Self {
             system: AudioSource {
-                enabled: true,
+                enabled: !cfg!(target_os = "macos"),
                 ..Default::default()
             },
             mic: AudioSource::default(),
@@ -471,13 +501,22 @@ impl Default for Config {
             performance: Performance::default(),
             audio: Audio::default(),
             output_dir: std::env::var_os("USERPROFILE")
+                .or_else(|| std::env::var_os("HOME"))
                 .map(PathBuf::from)
                 .unwrap_or_else(|| PathBuf::from("."))
-                .join("Videos")
+                .join(if cfg!(target_os = "macos") {
+                    "Movies"
+                } else {
+                    "Videos"
+                })
                 .join("Potato Recorder"),
             filename_format: "Potato_%Y-%m-%d_%H-%M-%S".into(),
             container: Container::Mkv,
-            ffmpeg: PathBuf::from("ffmpeg.exe"),
+            ffmpeg: PathBuf::from(if cfg!(windows) {
+                "ffmpeg.exe"
+            } else {
+                "ffmpeg"
+            }),
             hotkeys: Hotkeys::default(),
             replay_seconds: 30,
             replay_memory_mb: 64,

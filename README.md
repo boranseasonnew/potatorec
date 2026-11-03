@@ -1,8 +1,10 @@
 # Potato Recorder
 
-A native Rust recording utility for Windows 11. Capture a display or supported game/application window, encode with a tested hardware encoder, and retain independently editable audio tracks. No Electron, browser runtime, advertisements or telemetry.
+A native Rust recording utility for Windows 11, with experimental macOS and Linux ports. Capture a display or supported game/application window, encode with a tested hardware encoder, and retain independently editable audio tracks. No Electron, browser runtime, advertisements or telemetry.
 
-**Status: functional 0.1 engineering release, not the finished specification.** See [implementation status](docs/STATUS.md) before relying on it for irreplaceable footage. Performance superiority over OBS or Xbox Game Bar has **not** been established.
+**Status: 0.2 engineering preview, not the finished specification.**
+
+macOS universal DMG/app and Linux amd64 DEB/archive packages are built on native GitHub runners. See [platform support and installation](docs/CROSS_PLATFORM.md) for requirements and current limitations. The recording pipeline and shortcuts below describe Windows; Unix support differs. See [implementation status](docs/STATUS.md) before relying on it for irreplaceable footage. Performance superiority over OBS or Xbox Game Bar has **not** been established.
 
 ## Run
 
@@ -74,6 +76,6 @@ Project source is MIT licensed. Third-party components retain their own licenses
 
 ## Languages
 
-Language selection follows Windows on first launch and persists across restarts. All 23 catalogs are embedded; no translation service is contacted by the app. Each language has its own usage guide. Translations are machine-assisted with selected manual corrections and still need native-speaker review. Raw Windows/FFmpeg diagnostics remain technical source data.
+Language selection follows the OS locale on first launch and persists across restarts. All 23 catalogs are embedded; no translation service is contacted by the app. Each language has its own usage guide. Translations are machine-assisted with selected manual corrections and still need native-speaker review. Raw Windows/FFmpeg diagnostics remain technical source data.
 
 [English](docs/languages/en.md) · [Türkçe](docs/languages/tr.md) · [Azərbaycanca](docs/languages/az.md) · [Русский](docs/languages/ru.md) · [Deutsch](docs/languages/de.md) · [Français](docs/languages/fr.md) · [Español](docs/languages/es.md) · [Português (Brasil)](docs/languages/pt-BR.md) · [Italiano](docs/languages/it.md) · [Nederlands](docs/languages/nl.md) · [Polski](docs/languages/pl.md) · [Українська](docs/languages/uk.md) · [Română](docs/languages/ro.md) · [Magyar](docs/languages/hu.md) · [Čeština](docs/languages/cs.md) · [Slovenčina](docs/languages/sk.md) · [Български](docs/languages/bg.md) · [Српски](docs/languages/sr.md) · [Hrvatski](docs/languages/hr.md) · [Ελληνικά](docs/languages/el.md) · [Svenska](docs/languages/sv.md) · [Dansk](docs/languages/da.md) · [Suomi](docs/languages/fi.md)

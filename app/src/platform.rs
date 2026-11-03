@@ -498,6 +498,29 @@ pub fn ensure_output(path: &Path) -> Result<()> {
     Ok(())
 }
 
+pub fn sources_for(_: &Path) -> Vec<Source> {
+    sources()
+}
+pub fn prepare_config(_: &mut potato_core::config::Config) -> Result<()> {
+    Ok(())
+}
+pub fn backends() -> &'static [potato_core::config::Backend] {
+    use potato_core::config::Backend;
+    &[Backend::Auto, Backend::Wgc, Backend::Dxgi]
+}
+pub fn priorities() -> &'static [Priority] {
+    Priority::ALL
+}
+pub fn has_tray() -> bool {
+    true
+}
+pub fn system_audio_supported() -> bool {
+    true
+}
+pub fn note() -> &'static str {
+    "Windows native capture and audio"
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

@@ -206,8 +206,8 @@ impl PotatoApp {
         self.detect = Some(rx);
         std::thread::spawn(move || {
             let cap = Capabilities::detect(&exe);
-            let devices = audio::devices().unwrap_or_default();
-            let sources = platform::sources();
+            let devices = audio::devices_for(&exe).unwrap_or_default();
+            let sources = platform::sources_for(&exe);
             let _ = tx.send((cap, devices, sources));
             ctx.request_repaint();
         });
@@ -266,6 +266,10 @@ impl PotatoApp {
         }
     }
     fn hide(&mut self, ctx: &egui::Context) {
+        if !platform::has_tray() {
+            ctx.send_viewport_cmd(egui::ViewportCommand::Minimized(true));
+            return;
+        }
         self.hidden = true;
         ctx.send_viewport_cmd(egui::ViewportCommand::Visible(false));
     }
@@ -389,6 +393,7 @@ impl PotatoApp {
                     platform::qpc_100ns(),
                     pool,
                     Arc::new(AtomicBool::new(false)),
+                    c.ffmpeg.clone(),
                 )?;
                 let _ = tx.send(JobEvent::Meter(capture.metrics.clone()));
                 ctx.request_repaint();
@@ -470,9 +475,16 @@ impl PotatoApp {
             ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                 if ui
                     .add(
-                        egui::Button::new(RichText::new(tr(l, "Minimize to tray  ↘")).size(12.))
-                            .fill(ui.visuals().window_fill())
-                            .corner_radius(8.),
+                        egui::Button::new(
+                            RichText::new(if platform::has_tray() {
+                                tr(l, "Minimize to tray  ↘")
+                            } else {
+                                "Minimize  ↘"
+                            })
+                            .size(12.),
+                        )
+                        .fill(ui.visuals().window_fill())
+                        .corner_radius(8.),
                     )
                     .clicked()
                 {
@@ -527,9 +539,13 @@ impl PotatoApp {
                 self.controller.send(Control::PauseResume);
             }
             ui.label(
-                RichText::new(tr(current(ui), "F9"))
-                    .small()
-                    .color(ui.visuals().weak_text_color()),
+                RichText::new(if platform::has_tray() {
+                    tr(current(ui), "F9")
+                } else {
+                    ""
+                })
+                .small()
+                .color(ui.visuals().weak_text_color()),
             );
         });
     }
@@ -581,7 +597,10 @@ impl PotatoApp {
                             });
                             design::source_art(
                                 ui,
-                                matches!(self.config.video.source, Source::Window { .. }),
+                                matches!(
+                                    self.config.video.source,
+                                    Source::Window { .. } | Source::X11Window { .. }
+                                ),
                                 colors,
                             );
                             ui.horizontal(|ui| {
@@ -834,9 +853,9 @@ impl PotatoApp {
         card(ui, |ui| {
             section(ui, tr(l, "Capture source"));
             ui.add_enabled_ui(!active,|ui|{
-        egui::ComboBox::from_id_salt("source").width(500.).selected_text(self.config.video.source.label()).show_ui(ui,|ui|{for source in &self.sources{ui.selectable_value(&mut self.config.video.source,source.clone(),format!("{}  {}",if matches!(source,Source::Window{..}){"Window / Game"}else{"Monitor"},source.label()));}});
-        if ui.button(tr(l,"Refresh sources")).clicked(){self.sources=platform::sources();}
-        choice(ui,tr(l,"Capture backend"),&mut self.config.video.backend,Backend::ALL,Backend::label);
+        egui::ComboBox::from_id_salt("source").width(500.).selected_text(self.config.video.source.label()).show_ui(ui,|ui|{for source in &self.sources{ui.selectable_value(&mut self.config.video.source,source.clone(),format!("{}  {}",if matches!(source,Source::Window{..}|Source::X11Window{..}){"Window / Game"}else{"Monitor"},source.label()));}});
+        if ui.button(tr(l,"Refresh sources")).clicked(){self.sources=platform::sources_for(&self.config.ffmpeg);}
+        choice(ui,tr(l,"Capture backend"),&mut self.config.video.backend,platform::backends(),Backend::label);
         ui.checkbox(&mut self.config.video.cursor,tr(l,"Capture cursor"));
         ui.label(tr(current(ui), "Game recording uses the selected game window. Alt+Tab keeps the session open. Minimized windows, DRM and some exclusive fullscreen games can stop producing frames."));
         if matches!(self.config.video.source,Source::Window{..})&&self.config.video.backend==Backend::Dxgi{ui.colored_label(Color32::LIGHT_RED,"DXGI cannot capture a selected window. Choose WGC.");}
@@ -857,7 +876,7 @@ if let Ok(free)=platform::free_space(&self.config.output_dir){ui.label(fill(l,"{
         let l = self.config.language;
         ui.add_enabled_ui(!self.controller.active(),|ui|{card(ui,|ui|{section(ui,tr(l,"Resolution"));let current_resolution=resolution(&self.config.video,l);egui::ComboBox::from_id_salt("resolution").selected_text(current_resolution).width(250.).show_ui(ui,|ui|{for (w,h) in [(0,0),(640,360),(854,480),(1280,720),(1600,900),(1920,1080),(2560,1440),(3840,2160)]{if ui.selectable_label(self.config.video.width==w&&self.config.video.height==h,if w==0{tr(l,"Source resolution").into()}else{format!("{w} × {h}")}).clicked(){self.config.video.width=w;self.config.video.height=h;}}});ui.horizontal(|ui|{ui.label(tr(current(ui), "Custom / source (0 × 0)"));ui.add(egui::DragValue::new(&mut self.config.video.width).range(0..=7680).speed(2));ui.label(tr(current(ui), "×"));ui.add(egui::DragValue::new(&mut self.config.video.height).range(0..=4320).speed(2));});ui.add_space(16.);section(ui,tr(l,"Frame rate"));ui.horizontal(|ui|{for (i,label) in ["Common FPS","Integer FPS","Fractional FPS"].iter().enumerate(){ui.selectable_value(&mut self.config.video.fps_mode,i as u8,tr(l,label));}});match self.config.video.fps_mode{0=>{egui::ComboBox::from_id_salt("commonfps").selected_text(self.config.video.fps.to_string()).show_ui(ui,|ui|{for n in [24,25,30,48,50,60,75,90,100,120]{ui.selectable_value(&mut self.config.video.fps,Rate{num:n,den:1},format!("{n} FPS"));}});},1=>{let mut fps=(self.config.video.fps.value().round() as u32).clamp(1,120);if ui.add(egui::DragValue::new(&mut fps).range(1..=120).suffix(" FPS")).changed(){self.config.video.fps=Rate{num:fps,den:1};}},_=>{egui::ComboBox::from_id_salt("fractionfps").selected_text(self.config.video.fps.to_string()).show_ui(ui,|ui|{for n in [24000,30000,60000,120000]{ui.selectable_value(&mut self.config.video.fps,Rate{num:n,den:1001},format!("{n}/1001 · {:.3}",n as f64/1001.));}});ui.horizontal(|ui|{ui.add(egui::DragValue::new(&mut self.config.video.fps.num).range(1..=1_000_000));ui.label(tr(current(ui), "/"));ui.add(egui::DragValue::new(&mut self.config.video.fps.den).range(1..=1_000_000));});}}ui.label(fill(l,"{0} FPS requested. Actual delivery depends on the source and encoder. VFR preserves timestamps without an artificial FPS duplication filter.",&[format!("{:.3}",self.config.video.fps.value())]));});
         ui.add_space(16.);card(ui,|ui|{section(ui,tr(l,"Encoder"));egui::ComboBox::from_id_salt("encoder").selected_text(tr(l,self.config.video.encoder.label())).width(300.).show_ui(ui,|ui|{ui.selectable_value(&mut self.config.video.encoder,Encoder::Auto,tr(l,Encoder::Auto.label()));if let Some(cap)=&self.cap{for support in &cap.encoders{if support.supported{ui.selectable_value(&mut self.config.video.encoder,support.encoder,tr(l,support.encoder.label()));}}}});choice(ui,tr(l,"Quality"),&mut self.config.video.quality,Quality::ALL,Quality::label);choice(ui,tr(l,"Encoding speed"),&mut self.config.video.speed,Speed::ALL,Speed::label);ui.label(tr(current(ui), "AMD maps these five choices onto its three native modes: speed / balanced / quality. Quality changes actual quantization; speed changes encoder effort."));});
-        ui.add_space(12.);ui.checkbox(&mut self.advanced,tr(l,"Advanced controls"));if self.advanced{card(ui,|ui|{choice(ui,"Rate control",&mut self.config.video.rate_control,RateControl::ALL,RateControl::label);ui.add_enabled_ui(self.config.video.rate_control!=RateControl::Cqp,|ui|{ui.horizontal(|ui|{ui.label(tr(current(ui), "Target Kbps"));ui.add(egui::DragValue::new(&mut self.config.video.bitrate_kbps).range(100..=500000));ui.label(tr(current(ui), "Maximum Kbps"));ui.add(egui::DragValue::new(&mut self.config.video.max_bitrate_kbps).range(100..=500000));});});ui.horizontal(|ui|{ui.label(tr(current(ui), "Keyframe interval (seconds)"));ui.add(egui::DragValue::new(&mut self.config.video.keyframe_seconds).range(1..=30));});egui::ComboBox::from_label(tr(current(ui), "H.264 profile")).selected_text(&self.config.video.profile).show_ui(ui,|ui|{for p in ["high","main","baseline"]{ui.selectable_value(&mut self.config.video.profile,p.into(),p);}});ui.horizontal(|ui|{ui.label(tr(current(ui), "B-frames (0 recommended for compatibility)"));ui.add(egui::DragValue::new(&mut self.config.video.bframes).range(0..=3));});choice(ui,"WGC scaling filter",&mut self.config.video.scaling,Scaling::ALL,Scaling::label);egui::ComboBox::from_label(tr(current(ui), "Frame transfer path")).selected_text(self.config.video.transfer.label()).width(430.).show_ui(ui,|ui|{for p in [GpuPath::CpuTransfer,GpuPath::Direct,GpuPath::D3d11Nv12,GpuPath::AmfNv12]{ui.selectable_value(&mut self.config.video.transfer,p,p.label());}});ui.label(tr(current(ui), "GPU paths depend on driver interoperability and may fail. The RAM compatibility path is verified on the development host. Intel QSV, Media Foundation and software use the RAM path. No zero-copy performance claim is made."));ui.add_enabled(false,egui::Checkbox::new(&mut false,"Encoder lookahead (disabled for low overhead)"));ui.label(tr(current(ui), "SDR only. Advanced HDR, custom color-space/range conversion and per-device B-frame capability enumeration are not implemented."));});}
+        ui.add_space(12.);ui.checkbox(&mut self.advanced,tr(l,"Advanced controls"));if self.advanced{card(ui,|ui|{choice(ui,"Rate control",&mut self.config.video.rate_control,RateControl::ALL,RateControl::label);ui.add_enabled_ui(self.config.video.rate_control!=RateControl::Cqp,|ui|{ui.horizontal(|ui|{ui.label(tr(current(ui), "Target Kbps"));ui.add(egui::DragValue::new(&mut self.config.video.bitrate_kbps).range(100..=500000));ui.label(tr(current(ui), "Maximum Kbps"));ui.add(egui::DragValue::new(&mut self.config.video.max_bitrate_kbps).range(100..=500000));});});ui.horizontal(|ui|{ui.label(tr(current(ui), "Keyframe interval (seconds)"));ui.add(egui::DragValue::new(&mut self.config.video.keyframe_seconds).range(1..=30));});egui::ComboBox::from_label(tr(current(ui), "H.264 profile")).selected_text(&self.config.video.profile).show_ui(ui,|ui|{for p in ["high","main","baseline"]{ui.selectable_value(&mut self.config.video.profile,p.into(),p);}});ui.horizontal(|ui|{ui.label(tr(current(ui), "B-frames (0 recommended for compatibility)"));ui.add(egui::DragValue::new(&mut self.config.video.bframes).range(0..=3));});choice(ui,if cfg!(windows){"WGC scaling filter"}else{"Scaling filter"},&mut self.config.video.scaling,Scaling::ALL,Scaling::label);ui.add_enabled_ui(cfg!(windows),|ui|{egui::ComboBox::from_label(tr(current(ui), "Frame transfer path")).selected_text(self.config.video.transfer.label()).width(430.).show_ui(ui,|ui|{for p in [GpuPath::CpuTransfer,GpuPath::Direct,GpuPath::D3d11Nv12,GpuPath::AmfNv12]{ui.selectable_value(&mut self.config.video.transfer,p,p.label());}});});ui.label(tr(current(ui), "GPU paths depend on driver interoperability and may fail. The RAM compatibility path is verified on the development host. Intel QSV, Media Foundation and software use the RAM path. No zero-copy performance claim is made."));ui.add_enabled(false,egui::Checkbox::new(&mut false,"Encoder lookahead (disabled for low overhead)"));ui.label(tr(current(ui), "SDR only. Advanced HDR, custom color-space/range conversion and per-device B-frame capability enumeration are not implemented."));});}
 if ui.button(tr(l,"Reset to defaults")).clicked(){self.config.video=Video::default();}});
     }
     fn audio(&mut self, ui: &mut egui::Ui) {
@@ -927,7 +946,7 @@ if ui.button(tr(l,"Reset to defaults")).clicked(){self.config.audio.apply(VoiceP
     }
     fn performance(&mut self, ui: &mut egui::Ui) {
         let l = self.config.language;
-        ui.add_enabled_ui(!self.controller.active(),|ui|{card(ui,|ui|{let p=self.config.performance.profile;choice(ui,tr(l,"Performance Profile"),&mut self.config.performance.profile,Profile::ALL,Profile::label);if p!=self.config.performance.profile{self.config.performance.apply(self.config.performance.profile,&mut self.config.video);}number_choice(ui,tr(l,"Processing Workers"),&mut self.config.performance.workers,l);ui.label(tr(current(ui), "Controls the application's audio DSP pool and FFmpeg CPU conversion/software encoding. Hardware encoder internal threads are controlled by its driver. Auto caps the DSP pool at 3."));number_choice(ui,tr(l,"Frame Buffer Count"),&mut self.config.performance.buffers,l);ui.label(tr(current(ui), "Controls AMF async_depth (in-flight encoder frames). Auto = 2. Other hardware backends retain their own capture queues. More buffering raises latency and memory use; low memory forces 1."));choice(ui,tr(l,"Process Priority"),&mut self.config.performance.priority,Priority::ALL,Priority::label);if self.config.performance.priority==Priority::High{ui.colored_label(Color32::YELLOW,"High priority can starve your game and audio services. Normal is recommended.");}for (label,value) in [("Reduce UI updates while recording",&mut self.config.performance.reduce_ui),("Low memory mode",&mut self.config.performance.low_memory),("Prefer hardware encoding",&mut self.config.performance.prefer_hardware),("Detailed engine logs",&mut self.config.performance.detailed_logs),("Minimize to tray on record",&mut self.config.performance.minimize_on_start)]{ui.checkbox(value,tr(l,label));}ui.label(tr(current(ui), "Preview rendering stays off. Profiles never change game settings, recording resolution or target FPS."));ui.add_enabled(false,egui::Checkbox::new(&mut false,"Adaptive performance (not implemented)"));});});
+        ui.add_enabled_ui(!self.controller.active(),|ui|{card(ui,|ui|{let p=self.config.performance.profile;choice(ui,tr(l,"Performance Profile"),&mut self.config.performance.profile,Profile::ALL,Profile::label);if p!=self.config.performance.profile{self.config.performance.apply(self.config.performance.profile,&mut self.config.video);}number_choice(ui,tr(l,"Processing Workers"),&mut self.config.performance.workers,l);ui.label(tr(current(ui), "Controls the application's audio DSP pool and FFmpeg CPU conversion/software encoding. Hardware encoder internal threads are controlled by its driver. Auto caps the DSP pool at 3."));ui.add_enabled_ui(cfg!(windows),|ui|{number_choice(ui,tr(l,"Frame Buffer Count"),&mut self.config.performance.buffers,l);});ui.label(tr(current(ui), "Controls AMF async_depth (in-flight encoder frames). Auto = 2. Other hardware backends retain their own capture queues. More buffering raises latency and memory use; low memory forces 1."));choice(ui,tr(l,"Process Priority"),&mut self.config.performance.priority,platform::priorities(),Priority::label);if self.config.performance.priority==Priority::High{ui.colored_label(Color32::YELLOW,"High priority can starve your game and audio services. Normal is recommended.");}for (label,value) in [("Reduce UI updates while recording",&mut self.config.performance.reduce_ui),("Low memory mode",&mut self.config.performance.low_memory),("Prefer hardware encoding",&mut self.config.performance.prefer_hardware),("Detailed engine logs",&mut self.config.performance.detailed_logs),("Minimize to tray on record",&mut self.config.performance.minimize_on_start)]{if !cfg!(windows)&&label=="Low memory mode"{continue;}ui.checkbox(value,if !cfg!(windows)&&label=="Minimize to tray on record"{"Minimize on record"}else{tr(l,label)});}ui.label(tr(current(ui), "Preview rendering stays off. Profiles never change game settings, recording resolution or target FPS."));ui.add_enabled(false,egui::Checkbox::new(&mut false,"Adaptive performance (not implemented)"));});});
         ui.add_space(16.);
         card(ui, |ui| {
             section(ui, tr(current(ui), "Measured statistics"));
@@ -989,6 +1008,12 @@ if ui.button(tr(l,"Reset to defaults")).clicked(){self.config.audio.apply(VoiceP
         });
     }
     fn hotkeys(&mut self, ui: &mut egui::Ui) {
+        if !platform::has_tray() {
+            card(ui, |ui| {
+                ui.label(platform::note());
+            });
+            return;
+        }
         let l = self.config.language;
         ui.add_enabled_ui(!self.controller.active(),|ui|{card(ui,|ui|{section(ui,tr(current(ui), "Global shortcuts"));for (label,key) in [("Start recording",&mut self.config.hotkeys.record),("Pause / resume",&mut self.config.hotkeys.pause),("Mute microphone",&mut self.config.hotkeys.mute),("Show / hide app",&mut self.config.hotkeys.visibility),("Save replay",&mut self.config.hotkeys.replay)]{egui::ComboBox::from_label(tr(l,label)).selected_text(format!("F{}",*key-0x6f)).show_ui(ui,|ui|{for i in (1..=24).filter(|i|*i!=12){ui.selectable_value(key,0x6f+i,format!("F{i}"));}});}ui.label(tr(current(ui), "Windows RegisterHotKey detects conflicts with other apps. Duplicate assignments are rejected. Key repeat cannot stop a recording accidentally. Changes take effect when applied."));if ui.button(tr(l,"Apply shortcuts")).clicked(){match self.config.validate(){Ok(())=>{self.bridge.take();self.bridge=Some(NativeBridge::start(self.config.hotkeys.clone(),self.config.language,ui.ctx().clone()));self.save();},Err(e)=>self.notice=e.to_string()}}ui.label(tr(current(ui), "Save Replay saves the active video-only RAM buffer. Start it explicitly on the Recording page."));});});
     }
@@ -1051,6 +1076,10 @@ if ui.button(tr(l,"Reset to defaults")).clicked(){self.config.audio.apply(VoiceP
     }
     fn settings(&mut self, ui: &mut egui::Ui) {
         let l = self.config.language;
+        if !cfg!(windows) {
+            ui.label(platform::note());
+            ui.add_space(12.);
+        }
         card(ui, |ui| {
             egui::ComboBox::from_label(tr(l, "Language"))
                 .width(320.)
@@ -1160,6 +1189,12 @@ impl eframe::App for PotatoApp {
             self.cap = Some(cap);
             self.devices = devices;
             self.sources = sources;
+            #[cfg(not(windows))]
+            if matches!(self.config.video.source, Source::Monitor { .. }) {
+                if let Some(source) = self.sources.first() {
+                    self.config.video.source = source.clone();
+                }
+            }
             self.detect = None;
         }
         let events: Vec<_> = self
@@ -1337,7 +1372,7 @@ impl eframe::App for PotatoApp {
                     });
                 ui.add_space(11.);
                 ui.label(
-                    RichText::new(tr(current(ui), "v0.1.0   ·   Made for your game"))
+                    RichText::new(format!("v{} · Potato Recorder", env!("CARGO_PKG_VERSION")))
                         .size(10.)
                         .color(colors.muted),
                 );
@@ -1575,6 +1610,7 @@ fn audio_source(
     l: Language,
 ) {
     ui.push_id(name, |ui| {
+        if render && !platform::system_audio_supported(){s.enabled=false;ui.label(name);ui.label("System loopback is unavailable on macOS. Use a configured virtual device as Additional Input.");return;}
         ui.horizontal(|ui| {
             ui.label(RichText::new(name).size(17.).strong());
             ui.checkbox(&mut s.enabled, tr(l, "Enabled"));

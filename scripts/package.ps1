@@ -10,7 +10,7 @@ foreach($name in @('README.md','LICENSE','THIRD_PARTY_NOTICES.md')) {
     Copy-Item -LiteralPath (Join-Path $root $name) -Destination $destination
 }
 Copy-Item -LiteralPath (Join-Path $root 'docs') -Destination $destination -Recurse -Force
-$metadata=& (Join-Path $root 'scripts\cargo.ps1') metadata --locked --offline --format-version 1 | ConvertFrom-Json
+$metadata=& (Join-Path $root 'scripts\cargo.ps1') metadata --locked --format-version 1 | ConvertFrom-Json
 $licenseRoot=Join-Path $destination 'third-party-licenses'
 foreach($package in $metadata.packages) {
     if($package.name -in @('potato-core','potato-recorder')) {continue}
@@ -23,7 +23,8 @@ foreach($package in $metadata.packages) {
         if(Test-Path -LiteralPath $licenseDirectory -PathType Container){Copy-Item -LiteralPath $licenseDirectory -Destination (Join-Path $licenseDestination 'licenses') -Recurse -Force;break}
     }
 }
-$archive=Join-Path $root 'dist\Potato-Recorder-0.1.0-windows-x64.zip'
+$version=($metadata.packages | Where-Object name -EQ 'potato-recorder' | Select-Object -First 1).version
+$archive=Join-Path $root ('dist\Potato-Recorder-'+$version+'-windows-x64.zip')
 Get-ChildItem -LiteralPath $licenseRoot -Recurse -File | Where-Object LastWriteTime -LT ([datetime]'1980-01-01') | ForEach-Object {$_.LastWriteTime=[datetime]'1980-01-01'}
 Compress-Archive -LiteralPath $destination -DestinationPath $archive -Force
 Get-FileHash -LiteralPath $exe -Algorithm SHA256 | Format-List
