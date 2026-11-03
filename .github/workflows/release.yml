@@ -41,6 +41,16 @@ jobs:
         run: |
           cargo build --release --locked --target x86_64-apple-darwin
           cargo build --release --locked --target aarch64-apple-darwin
+      - name: Retain macOS binaries for packaging diagnostics
+        if: runner.os == 'macOS'
+        uses: actions/upload-artifact@v4
+        with:
+          name: macos-native-binaries
+          path: |
+            target/x86_64-apple-darwin/release/potato-recorder
+            target/x86_64-apple-darwin/release/potato-recorder-cli
+            target/aarch64-apple-darwin/release/potato-recorder
+            target/aarch64-apple-darwin/release/potato-recorder-cli
       - name: Actual X11 + PulseAudio recording smoke test
         if: runner.os == 'Linux'
         env:
