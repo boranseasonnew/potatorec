@@ -1,10 +1,10 @@
-name: Cross-platform packages
+name: macOS package fallback
 on:
   workflow_dispatch:
   push:
-    branches: [codex/cross-platform-release]
+    branches: [codex/macos-package-check]
 concurrency:
-  group: packages-${{ github.ref }}
+  group: macos-package-fallback-${{ github.ref }}
   cancel-in-progress: true
 permissions:
   contents: read
@@ -13,7 +13,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [windows-latest, ubuntu-24.04, macos-latest]
+        os: [macos-15-intel]
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
