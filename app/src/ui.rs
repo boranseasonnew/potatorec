@@ -1190,10 +1190,10 @@ impl eframe::App for PotatoApp {
             self.devices = devices;
             self.sources = sources;
             #[cfg(not(windows))]
-            if matches!(self.config.video.source, Source::Monitor { .. }) {
-                if let Some(source) = self.sources.first() {
-                    self.config.video.source = source.clone();
-                }
+            if matches!(self.config.video.source, Source::Monitor { .. })
+                && let Some(source) = self.sources.first()
+            {
+                self.config.video.source = source.clone();
             }
             self.detect = None;
         }

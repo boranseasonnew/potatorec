@@ -3,6 +3,9 @@ on:
   workflow_dispatch:
   push:
     branches: [codex/cross-platform-release]
+concurrency:
+  group: packages-${{ github.ref }}
+  cancel-in-progress: true
 permissions:
   contents: read
 jobs:
@@ -52,6 +55,12 @@ jobs:
           pactl set-default-sink potato_test
           target/release/potato-recorder-cli --self-test test-output/linux-smoke --audio --pause --rate 30000/1001
           ffmpeg -v error -i test-output/linux-smoke/*.mkv -map 0 -f null -
+          set +e
+          timeout 8s target/release/potato-recorder --ui-test en > test-output/linux-ui.log 2>&1
+          result=$?
+          set -e
+          cat test-output/linux-ui.log
+          test "$result" = 124
       - name: Package Windows with notices
         if: runner.os == 'Windows'
         run: ./scripts/package.ps1

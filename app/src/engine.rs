@@ -43,7 +43,7 @@ impl Capabilities {
             let version = platform::command(ffmpeg)
                 .args(["-hide_banner", "-version"])
                 .output()
-                .context("FFmpeg 8.1+ not found. Set ffmpeg.exe in Settings.")?;
+                .context("FFmpeg not found. Set its executable path in Settings.")?;
             anyhow::ensure!(version.status.success(), "Cannot run FFmpeg");
             let text = String::from_utf8_lossy(&version.stdout);
             let filters = platform::command(ffmpeg)

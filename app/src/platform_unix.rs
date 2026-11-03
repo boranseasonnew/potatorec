@@ -31,7 +31,7 @@ pub fn qpc_100ns() -> u64 {
 }
 pub fn os_language() -> Language {
     Language::from_code(
-        &std::env::var("LC_ALL")
+        std::env::var("LC_ALL")
             .or_else(|_| std::env::var("LANG"))
             .unwrap_or_else(|_| "en".into())
             .split('.')
@@ -268,29 +268,27 @@ pub fn sources_for(ffmpeg: &Path) -> Vec<Source> {
             }
         }
     }
-    if out.is_empty() {
-        if let Ok(o) = command("xdpyinfo").output() {
-            for line in String::from_utf8_lossy(&o.stdout).lines() {
-                if let Some(res) = line
-                    .trim()
-                    .strip_prefix("dimensions:")
-                    .and_then(|s| s.split_whitespace().next())
-                {
-                    if let Some((w, h)) = res
-                        .split_once('x')
-                        .and_then(|(w, h)| Some((w.parse::<u32>().ok()?, h.parse::<u32>().ok()?)))
-                    {
-                        out.push(Source::X11Display {
-                            display: display.clone(),
-                            x: 0,
-                            y: 0,
-                            width: w,
-                            height: h,
-                            name: format!("X11 · {w} × {h}"),
-                        });
-                        break;
-                    }
-                }
+    if out.is_empty()
+        && let Ok(o) = command("xdpyinfo").output()
+    {
+        for line in String::from_utf8_lossy(&o.stdout).lines() {
+            if let Some(res) = line
+                .trim()
+                .strip_prefix("dimensions:")
+                .and_then(|s| s.split_whitespace().next())
+                && let Some((w, h)) = res
+                    .split_once('x')
+                    .and_then(|(w, h)| Some((w.parse::<u32>().ok()?, h.parse::<u32>().ok()?)))
+            {
+                out.push(Source::X11Display {
+                    display: display.clone(),
+                    x: 0,
+                    y: 0,
+                    width: w,
+                    height: h,
+                    name: format!("X11 · {w} × {h}"),
+                });
+                break;
             }
         }
     }
@@ -305,16 +303,15 @@ pub fn sources_for(ffmpeg: &Path) -> Vec<Source> {
                 c[2].parse(),
                 c[5].parse(),
                 c[6].parse(),
-            ) {
-                if pid != std::process::id() {
-                    out.push(Source::X11Window {
-                        id,
-                        pid,
-                        width,
-                        height,
-                        title: c[8..].join(" "),
-                    });
-                }
+            ) && pid != std::process::id()
+            {
+                out.push(Source::X11Window {
+                    id,
+                    pid,
+                    width,
+                    height,
+                    title: c[8..].join(" "),
+                });
             }
         }
     }

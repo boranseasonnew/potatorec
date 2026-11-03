@@ -27,6 +27,8 @@ $version=($metadata.packages | Where-Object name -EQ 'potato-recorder' | Select-
 $archive=Join-Path $root ('dist\Potato-Recorder-'+$version+'-windows-x64.zip')
 Get-ChildItem -LiteralPath $licenseRoot -Recurse -File | Where-Object LastWriteTime -LT ([datetime]'1980-01-01') | ForEach-Object {$_.LastWriteTime=[datetime]'1980-01-01'}
 Compress-Archive -LiteralPath $destination -DestinationPath $archive -Force
+$digest=(Get-FileHash -LiteralPath $archive -Algorithm SHA256).Hash.ToLowerInvariant()
+[System.IO.File]::WriteAllText($archive+'.sha256', $digest+'  '+(Split-Path $archive -Leaf)+"`n",[System.Text.UTF8Encoding]::new($false))
 Get-FileHash -LiteralPath $exe -Algorithm SHA256 | Format-List
 Write-Output "Portable package: $archive"
 Write-Output 'FFmpeg/ffprobe are external requirements and were not bundled.'
