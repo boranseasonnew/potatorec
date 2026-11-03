@@ -1,0 +1,10 @@
+/target/
+/.tools/
+/dist/*
+!/dist/.gitkeep
+*.partial*
+*.pcm
+*.f32le
+*.snapshot.ts
+*.log
+/test-output/

@@ -1,0 +1,20 @@
+name: Windows
+on: [push, pull_request]
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+      - run: cargo fmt --all -- --check
+      - run: cargo clippy --workspace --all-targets --locked -- -D warnings
+      - run: cargo test --workspace --locked -- --skip independent_audio_tracks_retain_distinct_signals
+      - run: cargo build --release --locked
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Potato-Recorder-windows-x64
+          path: |
+            target/release/potato-recorder.exe
+            target/release/potato-recorder-cli.exe
