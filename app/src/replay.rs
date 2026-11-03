@@ -50,12 +50,14 @@ impl Replay {
             active: Arc::new(AtomicBool::new(false)),
         }
     }
-    pub fn start(&mut self, c: Config, cap: &Capabilities) -> Result<()> {
+    pub fn start(&mut self, mut c: Config, cap: &Capabilities) -> Result<()> {
         anyhow::ensure!(
             !self.active.load(Ordering::Relaxed),
             "Replay already active"
         );
         c.validate()?;
+        platform::prepare_config(&mut c)?;
+        platform::validate_source_for(&c.video.source, &c.ffmpeg)?;
         platform::ensure_output(&c.output_dir)?;
         if let Some(h) = self.join.take() {
             let _ = h.join();

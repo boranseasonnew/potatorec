@@ -35,6 +35,7 @@ pub fn capture_filter(c: &Config, backend: Backend) -> Result<String, String> {
         let source = match v.source {
             Source::Monitor { index, .. } => format!("monitor_idx={index}"),
             Source::Window { hwnd, .. } => format!("hwnd={hwnd}"),
+            _ => return Err("Select a Windows capture source for WGC".into()),
         };
         let (w, h) = if v.width == 0 {
             (-2, -2)
@@ -161,6 +162,22 @@ pub fn encoder_args(c: &Config, encoder: Encoder) -> Vec<String> {
             }
             put("-b:v", (v.bitrate_kbps * 1000).to_string());
         }
+        Encoder::AppleH264 | Encoder::AppleHevc => {
+            put("-allow_sw", "0".into());
+            put("-realtime", "1".into());
+            put(
+                "-prio_speed",
+                if matches!(speed, Speed::UltraFast | Speed::Fast) {
+                    "1"
+                } else {
+                    "0"
+                }
+                .into(),
+            );
+            if v.rate_control == RateControl::Cqp {
+                put("-q:v", (100 - qp * 2).to_string());
+            }
+        }
         Encoder::Auto => {}
     }
     if v.rate_control != RateControl::Cqp {
@@ -203,6 +220,9 @@ pub fn recording_args(
     out: &Path,
 ) -> Result<Vec<String>, String> {
     c.validate().map_err(|e| e.to_string())?;
+    if matches!(backend, Backend::X11 | Backend::AvFoundation) {
+        return unix_recording_args(c, backend, encoder, out);
+    }
     let mut graph = capture_filter(c, backend)?;
     match path {
         GpuPath::Direct => {}
@@ -270,6 +290,130 @@ pub fn recording_args(
     Ok(a)
 }
 
+fn unix_recording_args(
+    c: &Config,
+    backend: Backend,
+    encoder: Encoder,
+    out: &Path,
+) -> Result<Vec<String>, String> {
+    let v = &c.video;
+    let mut a = vec![
+        "-hide_banner".into(),
+        "-loglevel".into(),
+        if c.performance.detailed_logs {
+            "verbose"
+        } else {
+            "info"
+        }
+        .into(),
+        "-n".into(),
+    ];
+    match (backend, &v.source) {
+        (
+            Backend::X11,
+            Source::X11Display {
+                display,
+                x,
+                y,
+                width,
+                height,
+                ..
+            },
+        ) => {
+            a.extend([
+                "-f".into(),
+                "x11grab".into(),
+                "-framerate".into(),
+                v.fps.to_string(),
+                "-draw_mouse".into(),
+                u8::from(v.cursor).to_string(),
+                "-video_size".into(),
+                format!("{width}x{height}"),
+                "-i".into(),
+                format!("{display}+{x},{y}"),
+            ]);
+        }
+        (
+            Backend::X11,
+            Source::X11Window {
+                id, width, height, ..
+            },
+        ) => {
+            let display = std::env::var("DISPLAY").map_err(|_| "X11 DISPLAY is unavailable")?;
+            a.extend([
+                "-f".into(),
+                "x11grab".into(),
+                "-framerate".into(),
+                v.fps.to_string(),
+                "-draw_mouse".into(),
+                u8::from(v.cursor).to_string(),
+                "-window_id".into(),
+                id.to_string(),
+                "-video_size".into(),
+                format!("{width}x{height}"),
+                "-i".into(),
+                display,
+            ]);
+        }
+        (Backend::AvFoundation, Source::MacDisplay { name, .. }) => {
+            if !name
+                .strip_prefix("Capture screen ")
+                .is_some_and(|s| s.parse::<u32>().is_ok())
+            {
+                return Err("AVFoundation recording accepts display sources only".into());
+            }
+            a.extend([
+                "-f".into(),
+                "avfoundation".into(),
+                "-framerate".into(),
+                v.fps.to_string(),
+                "-capture_cursor".into(),
+                u8::from(v.cursor).to_string(),
+                "-i".into(),
+                format!("{name}:none"),
+            ]);
+        }
+        _ => return Err("Select a source supported by this operating system".into()),
+    }
+    let filter = if v.scaling == Scaling::Point {
+        "neighbor"
+    } else {
+        v.scaling.ffmpeg()
+    };
+    let scale = if v.width == 0 {
+        format!("scale=trunc(iw/2)*2:trunc(ih/2)*2:flags={filter}")
+    } else {
+        format!(
+            "scale={}:{}:force_original_aspect_ratio=decrease:force_divisible_by=2:flags={filter},pad={}:{}:(ow-iw)/2:(oh-ih)/2",
+            v.width, v.height, v.width, v.height
+        )
+    };
+    a.extend([
+        "-filter_complex_threads".into(),
+        c.performance.worker_count().to_string(),
+        "-filter_complex".into(),
+        format!("[0:v]setpts=PTS-STARTPTS,{scale},format=nv12[video]"),
+        "-map".into(),
+        "[video]".into(),
+        "-an".into(),
+    ]);
+    a.extend(encoder_args(c, encoder));
+    a.extend([
+        "-fps_mode".into(),
+        "vfr".into(),
+        "-stats_period".into(),
+        "0.5".into(),
+        "-progress".into(),
+        "pipe:1".into(),
+        "-cluster_time_limit".into(),
+        "1000".into(),
+        "-f".into(),
+        "matroska".into(),
+        out.to_string_lossy().into_owned(),
+    ]);
+    Ok(a)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -311,6 +455,68 @@ mod tests {
         assert!(a.windows(2).any(|x| x == ["-quality", "speed"]));
         c.video.quality = Quality::VeryHigh;
         assert_ne!(a, encoder_args(&c, Encoder::AmdH264));
+    }
+    #[test]
+    fn native_capture_arguments_preserve_rate_and_reject_wrong_source() {
+        let mut c = Config::default();
+        c.video.fps = Rate::new(30000, 1001).unwrap();
+        c.video.source = Source::X11Display {
+            display: ":99".into(),
+            x: 1280,
+            y: 0,
+            width: 1920,
+            height: 1080,
+            name: "display".into(),
+        };
+        let a = recording_args(
+            &c,
+            Backend::X11,
+            Encoder::Software,
+            GpuPath::CpuTransfer,
+            Path::new("capture.mkv"),
+        )
+        .unwrap();
+        assert!(a.windows(2).any(|x| x == ["-i", ":99+1280,0"]));
+        assert!(a.windows(2).any(|x| x == ["-framerate", "30000/1001"]));
+        assert!(
+            recording_args(
+                &c,
+                Backend::AvFoundation,
+                Encoder::AppleH264,
+                GpuPath::CpuTransfer,
+                Path::new("capture.mkv")
+            )
+            .is_err()
+        );
+        c.video.source = Source::MacDisplay {
+            device: 2,
+            name: "Capture screen 0".into(),
+        };
+        let a = recording_args(
+            &c,
+            Backend::AvFoundation,
+            Encoder::AppleH264,
+            GpuPath::CpuTransfer,
+            Path::new("capture.mkv"),
+        )
+        .unwrap();
+        assert!(a.windows(2).any(|x| x == ["-i", "Capture screen 0:none"]));
+        assert!(a.windows(2).any(|x| x == ["-allow_sw", "0"]));
+        assert!(!a.iter().any(|x| x.contains("d3d11")));
+        c.video.source = Source::MacDisplay {
+            device: 2,
+            name: "Camera".into(),
+        };
+        assert!(
+            recording_args(
+                &c,
+                Backend::AvFoundation,
+                Encoder::AppleH264,
+                GpuPath::CpuTransfer,
+                Path::new("capture.mkv")
+            )
+            .is_err()
+        );
     }
     #[test]
     fn priority_never_realtime() {

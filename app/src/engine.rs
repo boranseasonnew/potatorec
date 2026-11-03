@@ -31,6 +31,8 @@ pub struct Capabilities {
     pub version: String,
     pub wgc: bool,
     pub dxgi: bool,
+    pub x11: bool,
+    pub avfoundation: bool,
     pub encoders: Vec<EncoderSupport>,
     pub ffmpeg_license: String,
     pub error: Option<String>,
@@ -41,17 +43,26 @@ impl Capabilities {
             let version = platform::command(ffmpeg)
                 .args(["-hide_banner", "-version"])
                 .output()
-                .context("FFmpeg 8.1+ not found. Set ffmpeg.exe in Settings.")?;
+                .context("FFmpeg not found. Set its executable path in Settings.")?;
             anyhow::ensure!(version.status.success(), "Cannot run FFmpeg");
             let text = String::from_utf8_lossy(&version.stdout);
             let filters = platform::command(ffmpeg)
                 .args(["-hide_banner", "-filters"])
                 .output()?;
             let filters = String::from_utf8_lossy(&filters.stdout);
+            let devices = platform::command(ffmpeg)
+                .args(["-hide_banner", "-devices"])
+                .output()?;
+            let device_text = String::from_utf8_lossy(&devices.stdout);
             let mut out = Self {
                 version: text.lines().next().unwrap_or("Unknown FFmpeg").into(),
                 wgc: filters.contains("gfxcapture"),
                 dxgi: filters.contains("ddagrab"),
+                x11: cfg!(target_os = "linux")
+                    && device_text.contains("x11grab")
+                    && std::env::var_os("DISPLAY").is_some()
+                    && std::env::var("XDG_SESSION_TYPE").unwrap_or_default() != "wayland",
+                avfoundation: cfg!(target_os = "macos") && device_text.contains("avfoundation"),
                 ffmpeg_license: if text.contains("--enable-gpl") {
                     "External FFmpeg build enables GPL; not bundled under the app's MIT license"
                 } else {
@@ -60,7 +71,22 @@ impl Capabilities {
                 .into(),
                 ..Default::default()
             };
-            for encoder in Encoder::ALL.iter().copied().filter(|e| *e != Encoder::Auto) {
+            for encoder in Encoder::ALL.iter().copied().filter(|e| {
+                *e != Encoder::Auto
+                    && if cfg!(windows) {
+                        !matches!(e, Encoder::AppleH264 | Encoder::AppleHevc)
+                    } else if cfg!(target_os = "macos") {
+                        matches!(
+                            e,
+                            Encoder::AppleH264 | Encoder::AppleHevc | Encoder::Software
+                        )
+                    } else {
+                        matches!(
+                            e,
+                            Encoder::NvidiaH264 | Encoder::NvidiaHevc | Encoder::Software
+                        )
+                    }
+            }) {
                 let mut c = Config::default();
                 c.video.encoder = encoder;
                 let mut cmd = platform::command(ffmpeg);
@@ -128,6 +154,7 @@ impl Capabilities {
         }
         let order = if c.performance.prefer_hardware {
             vec![
+                Encoder::AppleH264,
                 Encoder::AmdH264,
                 Encoder::NvidiaH264,
                 Encoder::IntelH264,
@@ -145,7 +172,11 @@ impl Capabilities {
     pub fn backend(&self, c: &Config) -> Result<Backend> {
         let backend = match c.video.backend {
             Backend::Auto => {
-                if self.wgc {
+                if self.avfoundation {
+                    Backend::AvFoundation
+                } else if self.x11 {
+                    Backend::X11
+                } else if self.wgc {
                     Backend::Wgc
                 } else {
                     Backend::Dxgi
@@ -154,10 +185,12 @@ impl Capabilities {
             b => b,
         };
         anyhow::ensure!(
-            if backend == Backend::Wgc {
-                self.wgc
-            } else {
-                self.dxgi
+            match backend {
+                Backend::Wgc => self.wgc,
+                Backend::Dxgi => self.dxgi,
+                Backend::X11 => self.x11,
+                Backend::AvFoundation => self.avfoundation,
+                Backend::Auto => false,
             },
             "Capture backend is unavailable in this FFmpeg build"
         );
@@ -306,10 +339,11 @@ impl Controller {
             Phase::Starting | Phase::Recording | Phase::Paused | Phase::Finalizing
         )
     }
-    pub fn start(&mut self, c: Config, cap: Capabilities) -> Result<()> {
+    pub fn start(&mut self, mut c: Config, cap: Capabilities) -> Result<()> {
         anyhow::ensure!(!self.active(), "A recording is already active");
         c.validate()?;
-        platform::validate_source(&c.video.source)?;
+        platform::prepare_config(&mut c)?;
+        platform::validate_source_for(&c.video.source, &c.ffmpeg)?;
         platform::ensure_output(&c.output_dir)?;
         cap.select(&c)?;
         cap.backend(&c)?;
@@ -457,13 +491,22 @@ fn record_session(
     {
         let mut s = state.lock().unwrap();
         s.encoder = encoder.label().into();
-        s.backend = format!("{} · {}", backend.label(), c.video.transfer.label());
+        s.backend = format!(
+            "{} · {}",
+            backend.label(),
+            if matches!(backend, Backend::X11 | Backend::AvFoundation) {
+                "CPU capture/scaling → encoder"
+            } else {
+                c.video.transfer.label()
+            }
+        );
         s.output = Some(output.clone());
     }
     let mut stop = false;
     let mut previous_elapsed = 0.;
     let mut previous_frames = 0;
     while !stop {
+        platform::validate_source_for(&c.video.source, &c.ffmpeg)?;
         let index = manifest.clips.len();
         let segment = folder.join(format!("segment-{index}"));
         fs::create_dir(&segment)?;
@@ -489,6 +532,7 @@ fn record_session(
                     } else {
                         Arc::new(AtomicBool::new(false))
                     },
+                    c.ffmpeg.clone(),
                 )?);
             }
         }
@@ -728,9 +772,18 @@ fn read_progress(
 
 fn ffprobe(ffmpeg: &Path) -> PathBuf {
     if ffmpeg.parent().is_some_and(|p| !p.as_os_str().is_empty()) {
-        ffmpeg.with_file_name("ffprobe.exe")
+        ffmpeg.with_file_name(if cfg!(windows) {
+            "ffprobe.exe"
+        } else {
+            "ffprobe"
+        })
     } else {
-        "ffprobe.exe".into()
+        if cfg!(windows) {
+            "ffprobe.exe"
+        } else {
+            "ffprobe"
+        }
+        .into()
     }
 }
 pub fn inspect(ffmpeg: &Path, path: &Path) -> Result<serde_json::Value> {
@@ -1166,7 +1219,18 @@ pub fn cli(args: &[String]) -> Result<()> {
         }
         "--remux" => {
             let input = PathBuf::from(args.get(1).context("Usage: --remux recording.mkv")?);
-            println!("{}", remux(Path::new("ffmpeg.exe"), &input)?.display());
+            println!(
+                "{}",
+                remux(
+                    Path::new(if cfg!(windows) {
+                        "ffmpeg.exe"
+                    } else {
+                        "ffmpeg"
+                    }),
+                    &input
+                )?
+                .display()
+            );
         }
         _ => anyhow::bail!(
             "Usage: potato-recorder [--diagnose | --self-test OUTPUT_DIR [--audio] [--mic] [--rnnoise] [--dxgi] [--pause] | --recover session.json | --remux recording.mkv]"

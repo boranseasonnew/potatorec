@@ -1,6 +1,6 @@
 # Third-party notices
 
-Project code is MIT licensed. Dependency licenses are listed below from Cargo.lock/metadata. The package includes relevant license files copied from the installed crate sources. This list includes target-specific packages; not every listed package is linked into the Windows executable.
+Project code is MIT licensed. Dependency licenses are listed below from Cargo.lock/metadata. The package includes relevant license files copied from the installed crate sources. This list includes target-specific packages; not every listed package is linked into every platform executable.
 
 FFmpeg is not bundled or linked. The development FFmpeg 8.1 essentials build enables GPL/version3 and libx264. Its executable must not be relabeled MIT; users/distributors must meet that build's own source, notice and license obligations. The app makes no automatic FFmpeg redistribution.
 
@@ -21,8 +21,12 @@ nnnoiseless is BSD-3-Clause and includes RNNoise-derived code/model notices; its
 | anymap3 | 1.1.0 | BlueOak-1.0.0 OR MIT OR Apache-2.0 |
 | arboard | 3.7.0 | MIT OR Apache-2.0 |
 | array-init | 2.1.0 | MIT OR Apache-2.0 |
+| arrayvec | 0.7.8 | MIT OR Apache-2.0 |
+| as-raw-xcb-connection | 1.0.1 | MIT OR Apache-2.0 |
 | atomic-waker | 1.1.2 | Apache-2.0 OR MIT |
 | autocfg | 1.5.1 | Apache-2.0 OR MIT |
+| bit-set | 0.8.0 | Apache-2.0 OR MIT |
+| bit-vec | 0.8.0 | Apache-2.0 OR MIT |
 | bitflags | 1.3.2 | MIT/Apache-2.0 |
 | bitflags | 2.13.2 | MIT OR Apache-2.0 |
 | block2 | 0.5.1 | MIT |
@@ -33,6 +37,7 @@ nnnoiseless is BSD-3-Clause and includes RNNoise-derived code/model notices; its
 | bytes | 1.12.1 | MIT |
 | calloop | 0.13.0 | MIT |
 | calloop | 0.14.5 | MIT |
+| calloop-wayland-source | 0.3.0 | MIT |
 | calloop-wayland-source | 0.4.1 | MIT |
 | cc | 1.11.0 | MIT OR Apache-2.0 |
 | cfg-if | 1.0.5 | MIT OR Apache-2.0 |
@@ -40,6 +45,7 @@ nnnoiseless is BSD-3-Clause and includes RNNoise-derived code/model notices; its
 | cgl | 0.3.2 | MIT / Apache-2.0 |
 | chrono | 0.4.45 | MIT OR Apache-2.0 |
 | clipboard-win | 5.4.3 | BSL-1.0 |
+| codespan-reporting | 0.12.0 | Apache-2.0 |
 | combine | 4.6.9 | MIT |
 | concurrent-queue | 2.5.0 | Apache-2.0 OR MIT |
 | core-foundation | 0.9.4 | MIT OR Apache-2.0 |
@@ -64,6 +70,7 @@ nnnoiseless is BSD-3-Clause and includes RNNoise-derived code/model notices; its
 | ecolor | 0.33.3 | MIT OR Apache-2.0 |
 | eframe | 0.33.3 | MIT OR Apache-2.0 |
 | egui | 0.33.3 | MIT OR Apache-2.0 |
+| egui-wgpu | 0.33.3 | MIT OR Apache-2.0 |
 | egui-winit | 0.33.3 | MIT OR Apache-2.0 |
 | egui_glow | 0.33.3 | MIT OR Apache-2.0 |
 | either | 1.19.0 | MIT OR Apache-2.0 |
@@ -77,6 +84,7 @@ nnnoiseless is BSD-3-Clause and includes RNNoise-derived code/model notices; its
 | fdeflate | 0.3.7 | MIT OR Apache-2.0 |
 | find-msvc-tools | 0.1.15 | MIT OR Apache-2.0 |
 | flate2 | 1.1.10 | MIT OR Apache-2.0 |
+| foldhash | 0.2.0 | Zlib |
 | foreign-types | 0.5.0 | MIT/Apache-2.0 |
 | foreign-types-macros | 0.2.4 | MIT/Apache-2.0 |
 | foreign-types-shared | 0.3.1 | MIT/Apache-2.0 |
@@ -86,16 +94,20 @@ nnnoiseless is BSD-3-Clause and includes RNNoise-derived code/model notices; its
 | futures-util | 0.3.34 | MIT OR Apache-2.0 |
 | generic_singleton | 0.5.3 | MIT OR Apache-2.0 |
 | gethostname | 1.1.0 | Apache-2.0 |
+| getrandom | 0.3.4 | MIT OR Apache-2.0 |
 | getrandom | 0.4.3 | MIT OR Apache-2.0 |
 | gl_generator | 0.14.0 | Apache-2.0 |
 | glow | 0.16.0 | MIT OR Apache-2.0 OR Zlib |
 | glutin | 0.32.3 | Apache-2.0 |
 | glutin-winit | 0.5.0 | MIT |
 | glutin_egl_sys | 0.7.1 | Apache-2.0 |
+| glutin_glx_sys | 0.6.1 | Apache-2.0 |
 | glutin_wgl_sys | 0.6.1 | Apache-2.0 |
 | half | 2.7.1 | MIT OR Apache-2.0 |
+| hashbrown | 0.16.1 | MIT OR Apache-2.0 |
 | hashbrown | 0.17.1 | MIT OR Apache-2.0 |
 | hermit-abi | 0.5.3 | MIT OR Apache-2.0 |
+| hexf-parse | 0.2.1 | CC0-1.0 |
 | iana-time-zone | 0.1.65 | MIT OR Apache-2.0 |
 | iana-time-zone-haiku | 0.1.2 | MIT OR Apache-2.0 |
 | icu_collections | 2.4.0 | Unicode-3.0 |
@@ -120,9 +132,10 @@ nnnoiseless is BSD-3-Clause and includes RNNoise-derived code/model notices; its
 | khronos_api | 3.1.0 | Apache-2.0 |
 | libc | 0.2.191 | MIT OR Apache-2.0 |
 | libloading | 0.8.9 | ISC |
+| libm | 0.2.16 | MIT |
 | libredox | 0.1.25 | MIT |
-| linux-raw-sys | 0.4.15 | Apache-2.0 WITH LLVM-exception OR Apache-2.0 OR MIT |
 | linux-raw-sys | 0.12.1 | Apache-2.0 WITH LLVM-exception OR Apache-2.0 OR MIT |
+| linux-raw-sys | 0.4.15 | Apache-2.0 WITH LLVM-exception OR Apache-2.0 OR MIT |
 | litemap | 0.8.3 | Unicode-3.0 |
 | litrs | 1.0.1 | MIT OR Apache-2.0 |
 | lock_api | 0.4.14 | MIT OR Apache-2.0 |
@@ -133,6 +146,7 @@ nnnoiseless is BSD-3-Clause and includes RNNoise-derived code/model notices; its
 | miniz_oxide | 0.8.9 | MIT OR Zlib OR Apache-2.0 |
 | miniz_oxide | 0.9.1 | MIT OR Zlib OR Apache-2.0 |
 | moxcms | 0.8.1 | BSD-3-Clause OR Apache-2.0 |
+| naga | 27.0.3 | MIT OR Apache-2.0 |
 | ndk | 0.9.0 | MIT OR Apache-2.0 |
 | ndk-context | 0.1.1 | MIT OR Apache-2.0 |
 | ndk-sys | 0.6.0+11769913 | MIT OR Apache-2.0 |
@@ -179,6 +193,8 @@ nnnoiseless is BSD-3-Clause and includes RNNoise-derived code/model notices; its
 | plain | 0.2.3 | MIT/Apache-2.0 |
 | png | 0.18.1 | MIT OR Apache-2.0 |
 | polling | 3.11.0 | Apache-2.0 OR MIT |
+| portable-atomic | 1.15.0 | Apache-2.0 OR MIT |
+| portable-atomic-util | 0.2.8 | Apache-2.0 OR MIT |
 | potential_utf | 0.1.6 | Unicode-3.0 |
 | primal-check | 0.3.4 | MIT OR Apache-2.0 |
 | proc-macro-crate | 3.5.0 | MIT OR Apache-2.0 |
@@ -188,6 +204,7 @@ nnnoiseless is BSD-3-Clause and includes RNNoise-derived code/model notices; its
 | quick-error | 2.0.1 | MIT/Apache-2.0 |
 | quick-xml | 0.41.0 | MIT |
 | quote | 1.0.47 | MIT OR Apache-2.0 |
+| r-efi | 5.3.0 | MIT OR Apache-2.0 OR LGPL-2.1-or-later |
 | r-efi | 6.0.0 | MIT OR Apache-2.0 OR LGPL-2.1-or-later |
 | raw-window-handle | 0.6.2 | MIT OR Apache-2.0 OR Zlib |
 | rayon | 1.12.0 | MIT OR Apache-2.0 |
@@ -196,6 +213,9 @@ nnnoiseless is BSD-3-Clause and includes RNNoise-derived code/model notices; its
 | redox_syscall | 0.4.1 | MIT |
 | redox_syscall | 0.5.18 | MIT |
 | redox_syscall | 0.9.5 | MIT |
+| renderdoc-sys | 1.1.0 | MIT OR Apache-2.0 |
+| rustc-hash | 1.1.0 | Apache-2.0/MIT |
+| rustc-hash | 2.1.3 | Apache-2.0 OR MIT |
 | rustc_version | 0.4.1 | MIT OR Apache-2.0 |
 | rustfft | 6.4.1 | MIT OR Apache-2.0 |
 | rustix | 0.38.44 | Apache-2.0 WITH LLVM-exception OR Apache-2.0 OR MIT |
@@ -216,6 +236,7 @@ nnnoiseless is BSD-3-Clause and includes RNNoise-derived code/model notices; its
 | slab | 0.4.12 | MIT |
 | slotmap | 1.1.1 | Zlib |
 | smallvec | 1.16.4 | MIT OR Apache-2.0 |
+| smithay-client-toolkit | 0.19.2 | MIT |
 | smithay-client-toolkit | 0.20.0 | MIT |
 | smithay-clipboard | 0.7.3 | MIT |
 | smol_str | 0.2.2 | MIT OR Apache-2.0 |
@@ -239,13 +260,16 @@ nnnoiseless is BSD-3-Clause and includes RNNoise-derived code/model notices; its
 | tracing-core | 0.1.36 | MIT |
 | transpose | 0.2.3 | MIT OR Apache-2.0 |
 | ttf-parser | 0.25.1 | MIT OR Apache-2.0 |
+| type-map | 0.5.1 | MIT/Apache-2.0 |
 | unicode-ident | 1.0.27 | (MIT OR Apache-2.0) AND Unicode-3.0 |
 | unicode-segmentation | 1.13.3 | MIT OR Apache-2.0 |
+| unicode-width | 0.2.3 | MIT OR Apache-2.0 |
 | url | 2.5.8 | MIT OR Apache-2.0 |
 | utf8_iter | 1.1.0 | Apache-2.0 OR MIT |
 | utf_types | 1.0.0 | Apache-2.0 OR MIT |
 | version_check | 0.9.5 | MIT/Apache-2.0 |
 | walkdir | 2.5.0 | Unlicense/MIT |
+| wasip2 | 1.0.4+wasi-0.2.12 | Apache-2.0 WITH LLVM-exception OR Apache-2.0 OR MIT |
 | wasm-bindgen | 0.2.130 | MIT OR Apache-2.0 |
 | wasm-bindgen-futures | 0.4.80 | MIT OR Apache-2.0 |
 | wasm-bindgen-macro | 0.2.130 | MIT OR Apache-2.0 |
@@ -258,6 +282,7 @@ nnnoiseless is BSD-3-Clause and includes RNNoise-derived code/model notices; its
 | wayland-protocols | 0.32.13 | MIT |
 | wayland-protocols-experimental | 20250721.0.1 | MIT |
 | wayland-protocols-misc | 0.3.12 | MIT |
+| wayland-protocols-plasma | 0.3.12 | MIT |
 | wayland-protocols-wlr | 0.3.12 | MIT |
 | wayland-scanner | 0.31.11 | MIT |
 | wayland-sys | 0.31.11 | MIT |
@@ -265,6 +290,11 @@ nnnoiseless is BSD-3-Clause and includes RNNoise-derived code/model notices; its
 | web-time | 1.1.0 | MIT OR Apache-2.0 |
 | webbrowser | 1.2.6 | MIT OR Apache-2.0 |
 | weezl | 0.1.12 | MIT OR Apache-2.0 |
+| wgpu | 27.0.1 | MIT OR Apache-2.0 |
+| wgpu-core | 27.0.3 | MIT OR Apache-2.0 |
+| wgpu-core-deps-windows-linux-android | 27.0.0 | MIT OR Apache-2.0 |
+| wgpu-hal | 27.0.4 | MIT OR Apache-2.0 |
+| wgpu-types | 27.0.1 | MIT OR Apache-2.0 |
 | winapi-util | 0.1.11 | Unlicense OR MIT |
 | windows | 0.62.2 | MIT OR Apache-2.0 |
 | windows-collections | 0.3.2 | MIT OR Apache-2.0 |
@@ -291,7 +321,9 @@ nnnoiseless is BSD-3-Clause and includes RNNoise-derived code/model notices; its
 | windows_x86_64_msvc | 0.52.6 | MIT OR Apache-2.0 |
 | winit | 0.30.13 | Apache-2.0 |
 | winnow | 1.0.4 | MIT |
+| wit-bindgen | 0.57.1 | Apache-2.0 WITH LLVM-exception OR Apache-2.0 OR MIT |
 | writeable | 0.6.4 | Unicode-3.0 |
+| x11-dl | 2.21.0 | MIT |
 | x11rb | 0.13.2 | MIT OR Apache-2.0 |
 | x11rb-protocol | 0.13.2 | MIT OR Apache-2.0 |
 | xcursor | 0.3.11 | MIT |
